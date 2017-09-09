@@ -1,0 +1,6 @@
+package yaml
+
+pkgs = contrib
+
+makefile = Makefile
+objs = helper.h, helper.o
