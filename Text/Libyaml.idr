@@ -40,12 +40,20 @@ set_input_string (MkParser ptr) s = do
   foreign FFI_C "yaml_parser_set_input_string"
     (Ptr -> String -> Int -> IO ()) ptr s len
 
-parser_parse : Parser -> IO EventRaw
-parser_parse (MkParser p) = do
-  e <- malloc eventSize
+set_input_file : Parser -> File -> IO ()
+set_input_file (MkParser p) (FHandle f) = do
+  foreign FFI_C "yaml_parser_set_input_file"
+    (Ptr -> Ptr -> IO ()) p f
+
+parser_parse : Parser -> EventRaw -> IO EventRaw
+parser_parse (MkParser p) er@(MkEventRaw e) = do
   -- TODO: handle res
   foreign FFI_C "yaml_parser_parse" (Ptr -> Ptr -> IO ()) p e
-  pure (MkEventRaw e)
+  pure er
+
+event_delete : EventRaw -> IO ()
+event_delete (MkEventRaw e) =
+  foreign FFI_C "yaml_event_delete" (Ptr -> IO ()) e
 
 public export
 AnchorName : Type
@@ -161,10 +169,8 @@ getEvent (MkEventRaw e) = do
     -- YAML_SCALAR_EVENT,
     6 => do
       value <- foreign FFI_C "get_scalar_value" (Ptr -> IO String) e
-      putStrLn value
       -- TODO: handle null?
       ytag <- foreign FFI_C "get_scalar_tag" (Ptr -> IO String) e
-      putStrLn ytag
       let tag = stringToTag ytag
       style <- intToStyle <$> foreign FFI_C "get_scalar_style" (Ptr -> IO Int) e
       anchor <- safeString $ foreign FFI_C "get_scalar_anchor" (Ptr -> IO String) e
@@ -183,18 +189,36 @@ getEvent (MkEventRaw e) = do
     -- YAML_MAPPING_END_EVENT
     10 => pure EventMappingEnd
 
-go : Parser -> List Event -> IO (List Event)
-go p es = do
-  Just e <- getEvent !(parser_parse p)
+go : Parser -> EventRaw -> List Event -> IO (List Event)
+go p er es = do
+  Just e <- getEvent !(parser_parse p er)
     | Nothing => pure es
-  pure $ e :: !(go p es)
+  pure $ e :: !(go p er es)
 
 -- and now we throw the whole streaming interface out of the window...
 export
 decode : String -> IO (List Event)
 decode s = do -- TODO: bracket
   p <- parser_initialize
+  -- reusing one event here...
+  er <- MkEventRaw <$> malloc eventSize
   set_input_string p s
-  res <- reverse <$> go p []
+  res <- reverse <$> go p er []
+  event_delete er
   parser_delete p
   pure res
+
+export
+decodeFile : String -> IO (Either FileError (List Event))
+decodeFile fname = do -- TODO: bracket, reuse init/cleanup with above
+  p <- parser_initialize
+  Right file <- fopen fname "rb"
+    | Left err => pure (Left err)
+  set_input_file p file
+  er <- MkEventRaw <$> malloc eventSize
+  res <- List.reverse <$> go p er []
+  closeFile file
+  event_delete er
+  -- TODO: figure out why it can't cleaned up after reading file
+  -- parser_delete p
+  pure (Right res)
