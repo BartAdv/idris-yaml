@@ -1,2 +1,4 @@
 *.ibc
 helper.o
+libyaml.so
+yaml.h

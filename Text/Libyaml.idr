@@ -2,8 +2,8 @@ module Text.Libyaml
 
 import CFFI
 
-%include C "vendor/libyaml/include/yaml.h"
-%link C "vendor/libyaml/src/.libs/libyaml.so"
+%include C "yaml.h"
+%link C "libyaml.so"
 
 %include C "helper.h"
 %link C "helper.o"
@@ -72,6 +72,16 @@ data Style = Any
            | Folded
            | PlainNoTag
 
+export
+Eq Style where
+  Plain        == Plain = True
+  SingleQuoted == SingleQuoted = True
+  DoubleQuoted == DoubleQuoted = True
+  Literal      == Literal = True
+  Folded       == Folded = True
+  PlainNoTag   == PlainNoTag = True
+  _ == _ = False
+
 intToStyle : Int -> Style
 intToStyle 0 = Any
 intToStyle 1 = Any
@@ -92,6 +102,20 @@ data Tag = StrTag
          | MapTag
          | UriTag String
          | NoTag
+
+export
+Eq Tag where
+  StrTag      == StrTag = True
+  FloatTag    == FloatTag = True
+  NullTag     == NullTag = True
+  BoolTag     == BoolTag = True
+  SetTag      == SetTag = True
+  IntTag      == IntTag = True
+  SeqTag      == SeqTag = True
+  MapTag      == MapTag = True
+  (UriTag s1) == (UriTag s2) = s1 == s2
+  NoTag       == NoTag  = True
+  _ == _ = False
 
 tagToString : Tag -> String
 tagToString StrTag = "tag:yaml.org,2002:str"
@@ -128,6 +152,21 @@ data Event = EventStreamStart
            | EventSequenceEnd
            | EventMappingStart Anchor
            | EventMappingEnd
+
+export
+Eq Event where
+  EventStreamStart           == EventStreamStart        = True
+  EventStreamEnd             == EventStreamEnd          = True
+  EventDocumentStart         == EventDocumentStart      = True
+  EventDocumentEnd           == EventDocumentEnd        = True
+  (EventAlias a1)            == (EventAlias a2)         = a1 == a2
+  (EventScalar s1 t1 st1 a1) == (EventScalar s2 t2 st2 a2) =
+    s1 == s2 && t1 == t2 && st1 == st2 && a1 == a2
+  (EventSequenceStart a1)    == (EventSequenceStart a2) = a1 == a2
+  EventSequenceEnd           == EventSequenceEnd        = True
+  (EventMappingStart a1)     == (EventMappingStart a2)  = a1 == a2
+  EventMappingEnd            == EventMappingEnd         = True
+  _ == _ = False
 
 public export
 Show Event where
