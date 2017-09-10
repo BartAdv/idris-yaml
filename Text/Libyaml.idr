@@ -203,7 +203,7 @@ decode s = do -- TODO: bracket
   -- reusing one event here...
   er <- MkEventRaw <$> malloc eventSize
   set_input_string p s
-  res <- reverse <$> go p er []
+  res <- go p er []
   event_delete er
   parser_delete p
   pure res
@@ -216,7 +216,7 @@ decodeFile fname = do -- TODO: bracket, reuse init/cleanup with above
     | Left err => pure (Left err)
   set_input_file p file
   er <- MkEventRaw <$> malloc eventSize
-  res <- List.reverse <$> go p er []
+  res <- go p er []
   closeFile file
   event_delete er
   -- TODO: figure out why it can't cleaned up after reading file
